@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCook – Recepty co dům dal</title>
+    <!-- Připojení externího CSS souboru -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText">Připravuji databázi ingrediencí...</p>
+        </div>
+    </div>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <div class="logo">SmartCook</div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="index.html">Domů</a></li>
+                <li><a href="Favourite.html">Oblíbené</a></li>
+                <li><a href="Newsletter.html">Newsletter</a></li>
+                <!-- Zobrazí se pouze na mobilu podle zadání -->
+                <li class="mobile-only"><a href="Resources.html" class="mobile-link">Přísady</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- HLAVNÍ KONTEJNER APLIKACE -->
+    <div class="app-container">
+        
+        <!-- SIDE BAR (PC, Tablet) -->
+        <aside class="side-bar">
+            <div class="fridge-section">
+                <h3>Moje lednice</h3>
+                <!-- Vstupní řádek na přidávání přísad -->
+                <h4>Název ingredience</h4>
+                <input type="text" id="ingredientInput" class="ingredient-input" placeholder="např. Mléko">
+                <h4>Datum expirace</h4>
+                <div id="dateOfExpiration" class="date-of-expiration">
+                    <input type="number" id="dateOfExpirationDay" class="ingredient-input" placeholder="Den">
+                    <input type="number" id="dateOfExpirationMonth" class="ingredient-input" placeholder="Měsíc">
+                    <input type="number" id="dateOfExpirationYear" class="ingredient-input" placeholder="Rok">
+                </div>
+                <!-- Tlačítko přidat -->
+                <button id="addBtn" class="btn-add">Přidat do lednice</button>
+            </div>
+
+            <!-- Volné místo, kde se budou zobrazovat přidané přísady -->
+            <div id="ingredientsList" class="ingredients-list">
+                <!-- Sem bude JavaScript dynamicky vkládat přísady -->
+                <p class="empty-fridge-text">Lednice je prázdná</p>
+            </div>
+        </aside>
+
+        <!-- HLAVNÍ OBSAH (Zobrazování receptů) -->
+        <main class="main-content">
+            <h2>Doporučené recepty</h2>
+            
+            <div class="recipes-grid">
+                <!-- Tady se budou generovat karty z API, pro představu je tu jedna statická -->
+                <div class="recipe-card">
+                    <div class="recipe-img-placeholder">Obrázek jídla</div>
+                    <div class="recipe-info">
+                        <h4>Ukázkový recept</h4>
+                        <p class="recipe-category">Kategorie</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+    <!-- Vyskakovací okno pro detail receptu -->
+    <div id="recipeModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modalRecipeBody">
+                <!-- Sem JavaScript vloží detaily receptu -->
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

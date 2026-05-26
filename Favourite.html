@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCook – Oblíbené recepty</title>
+    <!-- Připojení stejného externího CSS souboru pro zachování designu -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <div class="logo">SmartCook</div>
+        <nav>
+            <ul class="nav-links">
+                <!-- Odkaz zpět na hlavní stránku -->
+                <li><a href="index.html">Domů</a></li>
+                <li><a href="Favourites.html" class="active-page">Oblíbené</a></li>
+                <li><a href="Newsletter.html">Newsletter</a></li>
+                <li class="mobile-only"><a href="Resources.html" class="mobile-link">Přísady</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- HLAVNÍ OBSAH (Zobrazování oblíbených receptů) -->
+    <main class="main-content">
+        <h2>Moje oblíbené recepty</h2>
+        
+        <!-- KONTEJNER PRO RECEPTY -->
+        <!-- Pro začátek má v sobě třídu 'is-empty', kterou pak JavaScriptem odebereš, až v LocalStorage nějaké recepty budou -->
+        <div id="favouritesContainer" class="recipes-grid is-empty">
+            
+            <!-- TENTO NÁPIS SE ZOBRAZÍ, POKUD JE SEZNAM PRÁZDNÝ -->
+            <div class="no-favourites-message">
+                <div class="message-icon">❤️</div>
+                <p>Zatím nemáš žádné oblíbené recepty.</p>
+                <a href="index.html" class="btn-browse">Prohlížet recepty</a>
+            </div>
+
+            <!-- SEM BUDE JAVASCRIPT DYNAMICKY VKLÁDAT KARTY RECEPTŮ Z LOCALSTORAGE -->
+            <!-- (Až tu budou recepty, JavaScript skryje '.no-favourites-message') -->
+
+        </div>
+    </main>
+    <!-- Vyskakovací okno pro detail receptu -->
+    <div id="recipeModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modalRecipeBody">
+                <!-- Sem JavaScript vloží detaily receptu -->
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCook – Moje přísady</title>
+    <!-- Připojení stejného externího CSS souboru -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <div class="logo">SmartCook</div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="index.html">Domů</a></li>
+                <li><a href="Favourite.html">Oblíbené</a></li>
+                <li><a href="Newsletter.html">Newsletter</a></li>
+                <!-- Na této stránce zvýrazníme záložku Přísady -->
+                <li class="mobile-only"><a href="Resources.html" class="active-page mobile-link">Přísady</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- HLAVNÍ OBSAH (Správa přísad na mobilu) -->
+    <main class="main-content resources-page">
+        <div class="resources-container">
+            
+            <div class="resources-header">
+                <h2>Moje lednice</h2>
+                <p>Spravujte své suroviny a hlídejte jejich expiraci i na cestách.</p>
+            </div>
+
+            <!-- Sekce pro přidávání (Kopie logiky ze sidebaru, ale v mobilním zobrazení) -->
+            <div class="fridge-section">
+                <label for="IngredientInput">Přidat novou surovinu:</label>
+                <input type="text" id="ingredientInput" class="ingredient-input" placeholder="Napiš přísadu (např. chicken)...">
+                <div id="dateOfExpiration" class="date-of-expiration">
+                    <input type="number" id="dateOfExpirationDay" class="ingredient-input" placeholder="Den">
+                    <input type="number" id="dateOfExpirationMonth" class="ingredient-input" placeholder="Měsíc">
+                    <input type="number" id="dateOfExpirationYear" class="ingredient-input" placeholder="Rok">
+                </div>
+                <button id="addBtn" class="btn-add">Přidat do lednice</button>
+            </div>
+
+            <!-- Seznam přísad roztažený na celou obrazovku mobilu -->
+            <div class="ingredients-list-full">
+                <h3>Suroviny v lednici</h3>
+                <div id="ingredientsList" class="ingredients-list-container">
+                    <!-- Sem bude JavaScript dynamicky vkládat přísady -->
+                    <p class="empty-fridge-text">Lednice je prázdná</p>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
