@@ -556,6 +556,34 @@ body {
 
 /* --- 4. Responzivita (Mobilní zobrazení) --- */
 @media (max-width: 768px) {
+    /* Oprava přetékajícího a obřího navbaru */
+    .top-bar {
+        padding: 0.75rem 0.75rem; /* Zmenšení vnitřního paddingu */
+        flex-direction: row;       /* Udrží logo a menu vedle sebe */
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+    .logo {
+        font-size: 1.1rem; /* Výrazné zmenšení velikosti loga */
+        flex-shrink: 0;    /* Zabrání deformaci loga */
+    }
+
+    .nav-links {
+        gap: 0.6rem;       /* Zmenšení mezer mezi odkazy z původních 1.5rem */
+    }
+
+    .nav-links a {
+        font-size: 0.85rem; /* Menší text odkazů, aby se vše vešlo na jeden řádek */
+        padding: 2px 0;
+    }
+
+    .nav-links a.active-page {
+        border-bottom-width: 1px; /* Jemnější podtržení aktivní stránky */
+        padding-bottom: 2px;
+    }
+
     .app-container {
         flex-direction: column;
     }
