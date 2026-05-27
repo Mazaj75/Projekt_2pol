@@ -725,10 +725,6 @@ body {
 
 
 /* --- Styly pro stránku Resources.html (Mobilní přísady) --- */
-.mobile-only {
-    display: none;
-}
-
 .resources-page {
     display: flex;
     justify-content: center;
