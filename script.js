@@ -1,3 +1,4 @@
+// === HTML ELEMENTY ===
 const ingredientInput = document.getElementById('ingredientInput') || document.getElementById('mobileIngredientInput');
 const ingredientsList = document.getElementById('ingredientsList') || document.getElementById('mobileIngredientsList');
 const expirationDay = document.getElementById('dateOfExpirationDay');
@@ -61,7 +62,7 @@ const translatedIngredientsToCzech = [
     { czech: "kukuřice", english: "corn" },
     { czech: "kukuřičný škrob", english: "cornstarch" },
     { czech: "krab", english: "crab" },
-    { czech: "brusinky", english: "独立 brusberries" },
+    { czech: "brusinky", english: "brusberries" },
     { czech: "smetana", english: "cream" },
     { czech: "okurka", english: "cucumber" },
     { czech: "kari", english: "curry" },
@@ -260,7 +261,6 @@ const translatedIngredientsToCzech = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Inicializace české databáze ingrediencí ze serveru nebo z cache
     initIngredientsDatabase();
 
     if (ingredientsList) {
@@ -278,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === recipeModal) recipeModal.style.display = "none";
     });
 
-    // --- Logika pro Newsletter ---
     const newsletterForm = document.getElementById('newsletterForm');
     const successMessage = document.getElementById('successMessage');
 
@@ -367,25 +366,128 @@ function removeAccents(text) {
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// --- POMOCNÁ FUNKCE: Překlad textu přes MyMemory API ---
+// --- POMOCNÁ FUNKCE: Překlad textu přes MyMemory API s Timeoutem (max 3 vteřiny) ---
 async function translateText(text, fromLang, toLang) {
+    if (!text || text.trim() === "") return "";
+    
+    // Vytvoříme timeout, aby překlad netrval věčně
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 vteřiny limit
+
     try {
-        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${fromLang}|${toLang}`);
+        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${fromLang}|${toLang}`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
         const data = await res.json();
-        return data.responseData.translatedText.trim();
+        
+        if (data.responseData && data.responseData.translatedText) {
+            return data.responseData.translatedText.trim();
+        }
+        return text;
     } catch (err) {
-        console.error("Chyba překladu:", err);
-        return text; // V případě nouze vrátí původní text
+        clearTimeout(timeoutId);
+        console.warn("Překlad vypršel nebo selhal, vracím původní text:", err);
+        return text; 
     }
 }
 
-// --- INICIALIZACE DATABÁZE (SCACHE) ---
+// --- BEZPEČNÝ CHUNKOVANÝ PŘEKLAD CELÉHO RECEPTU ---
+async function translateRecipe(meal) {
+    try {
+        // 1. Překlad základních metadat
+        const metaPackage = [
+            meal.strMeal,
+            meal.strCategory || "Neznámá",
+            meal.strArea || "Neznámá"
+        ].join(" ||| ");
+        
+        const translatedMeta = await translateText(metaPackage, 'en', 'cs');
+        const metaParts = translatedMeta.split(/\s*\|\|\|\s*/);
+        
+        const strMeal = metaParts[0] || meal.strMeal;
+        const strCategory = metaParts[1] || "Neznámá";
+        const strArea = metaParts[2] || "Neznámá";
+
+        // 2. Bezpečné kouskování postupu po větách (Max 400 znaků na dávku)
+        let strInstructions = "";
+        if (meal.strInstructions) {
+            const sentences = meal.strInstructions.split(/(?<=[.!?])\s+/);
+            let currentChunk = "";
+            const translatedChunks = [];
+
+            for (const sentence of sentences) {
+                if ((currentChunk + " " + sentence).length > 400) {
+                    if (currentChunk.trim()) {
+                        const trans = await translateText(currentChunk.trim(), 'en', 'cs');
+                        translatedChunks.push(trans);
+                    }
+                    currentChunk = sentence;
+                } else {
+                    currentChunk += (currentChunk ? " " : "") + sentence;
+                }
+            }
+            if (currentChunk.trim()) {
+                const trans = await translateText(currentChunk.trim(), 'en', 'cs');
+                translatedChunks.push(trans);
+            }
+            strInstructions = translatedChunks.join(" ");
+        }
+
+        // 3. Extrakce a překlad ingrediencí a jednotek
+        const rawIngredients = [];
+        const rawMeasures = [];
+        const extractedIngredients = [];
+
+        for (let i = 1; i <= 20; i++) {
+            const ing = meal[`strIngredient${i}`];
+            const meas = meal[`strMeasure${i}`];
+            if (ing && ing.trim() !== "") {
+                rawIngredients.push(ing.trim());
+                rawMeasures.push(meas ? meas.trim() : "");
+            }
+        }
+
+        let translatedIngredients = [];
+        if (rawIngredients.length > 0) {
+            const ingTrans = await translateText(rawIngredients.join(" ||| "), 'en', 'cs');
+            translatedIngredients = ingTrans.split(/\s*\|\|\|\s*/);
+        }
+
+        let translatedMeasures = [];
+        if (rawMeasures.length > 0) {
+            const measTrans = await translateText(rawMeasures.join(" ||| "), 'en', 'cs');
+            translatedMeasures = measTrans.split(/\s*\|\|\|\s*/);
+        }
+
+        for (let i = 0; i < rawIngredients.length; i++) {
+            // Zkusíme najít překlad v našem lokálním spolehlivém slovníku
+            const localMatch = localIngredientsDb.find(item => item.english.toLowerCase() === rawIngredients[i].toLowerCase());
+            const czIng = localMatch ? localMatch.czech : (translatedIngredients[i] || rawIngredients[i]);
+            const czMeas = translatedMeasures[i] || rawMeasures[i] || "";
+            
+            extractedIngredients.push({ ingredient: czIng, measure: czMeas });
+        }
+
+        return {
+            idMeal: meal.idMeal,
+            strMeal,
+            strMealThumb: meal.strMealThumb,
+            strCategory,
+            strArea,
+            strInstructions,
+            extractedIngredients
+        };
+    } catch (e) {
+        console.error("Vnitřní chyba překladače, vracím původní EN data:", e);
+        return null;
+    }
+}
+
+// --- INICIALIZACE DATABÁZE (CACHE) ---
 async function initIngredientsDatabase() {
-    // Naplníme lokální databázi naším spolehlivým slovníkem
     localIngredientsDb = translatedIngredientsToCzech;
     isDbReady = true;
-
-    // Okamžitě schováme loading overlay, už na nic nečekáme
     const loadingOverlay = document.getElementById('loadingOverlay');
     if (loadingOverlay) {
         loadingOverlay.style.display = 'none';
@@ -422,13 +524,11 @@ function checkAndValidateCzechIngredient(userInput) {
     const cleanUser = removeAccents(userInput.toLowerCase().trim());
     if (!cleanUser) return null;
 
-    // 1. KROK: Hledáme absolutní shodu bez diakritiky (kure -> kuře, mleko -> mléko)
     const exactMatch = localIngredientsDb.find(item => removeAccents(item.czech.toLowerCase()) === cleanUser);
     if (exactMatch) {
         return exactMatch.czech; 
     }
 
-    // 2. KROK: Pokud to není přesné, pustíme Levenshteina
     let bestMatchItem = null;
     let minDistance = 999;
 
@@ -440,20 +540,17 @@ function checkAndValidateCzechIngredient(userInput) {
         }
     });
 
-    // Přísnější tolerance, aby kuře nenabízelo cukr
     if (bestMatchItem && minDistance <= 2 && cleanUser.charAt(0) === removeAccents(bestMatchItem.czech.toLowerCase()).charAt(0)) {
         const confirmCorrection = confirm(`Ingredience „${userInput}“ nebyla nalezena.\nNemysleli jste: „${bestMatchItem.czech}“?`);
         if (confirmCorrection) {
             return bestMatchItem.czech;
         }
     } else {
-        // Povolíme uživateli přidat i vlastní surovinu, pokud si je jistý (např. nějakou exotickou)
         const forceAdd = confirm(`Ingredience „${userInput}“ není v našem doporučeném seznamu receptů. Chcete ji přesto do lednice přidat?`);
         if (forceAdd) {
             return userInput; 
         }
     }
-
     return null;
 }
 
@@ -536,7 +633,6 @@ function addIngredient() {
         return;
     }
 
-    // POUŽITÍ NOVÉ ČESKÉ VALIDACE
     const validatedName = checkAndValidateCzechIngredient(rawName);
     if (!validatedName) return; 
 
@@ -580,7 +676,6 @@ async function fetchRecipes(ingredients) {
     recipesGrid.innerHTML = '<p class="loading-text">Analyzuji vaši lednici bleskovou rychlostí...</p>';
     
     try {
-        // Získáme anglické ekvivalenty přímo z naší lokální spárované databáze
         const fridgeEnglishNames = ingredients.map(ing => {
             const match = localIngredientsDb.find(item => item.czech.toLowerCase() === ing.name.toLowerCase());
             return match ? match.english.toLowerCase() : ing.name.toLowerCase();
@@ -672,7 +767,7 @@ function displayRecipes(meals) {
         
         const countText = meal.usedFridgeCount !== undefined 
             ? `Využije z lednice: <strong>${meal.usedFridgeCount}</strong> ${meal.usedFridgeCount === 1 ? 'surovinu' : (meal.usedFridgeCount >= 2 && meal.usedFridgeCount <= 4 ? 'suroviny' : 'surovin')}` 
-            : `ID: ${meal.idMeal}`;
+            : `Zobrazení z oblíbených`;
 
         card.innerHTML = `
             <img src="${meal.strMealThumb}" alt="${meal.strMeal}" class="recipe-img">
@@ -696,63 +791,135 @@ function displayRecipes(meals) {
         recipesGrid.appendChild(card);
     });
 
+    // SPRÁVA TLAČÍTKA OBLÍBENÝCH S AUTOMATICKÝM UKLÁDÁNÍM PŘEKLADU DO CACHE
     document.querySelectorAll('.btn-fav').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const button = e.target;
             const idMeal = button.getAttribute('data-id');
-            const strMeal = button.getAttribute('data-title');
-            const strMealThumb = button.getAttribute('data-thumb');
             
             let favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
             const existingIndex = favourites.findIndex(fav => fav.idMeal === idMeal);
             
             if (existingIndex > -1) {
+                // Odebírání z oblíbených
                 favourites.splice(existingIndex, 1);
                 button.classList.remove('is-favourite');
                 if (!ingredientsList) {
                     button.closest('.recipe-card').remove();
                     if (favourites.length === 0) recipesGrid.innerHTML = '<p class="empty-recipes-text">Zatím nemáte žádné oblíbené recepty.</p>';
                 }
+                localStorage.setItem('favourite_recipes', JSON.stringify(favourites));
             } else {
-                favourites.push({ idMeal, strMeal, strMealThumb });
-                button.classList.add('is-favourite');
+                // Přidávání do oblíbených (Uloží přeloženou nebo záložní EN verzi pro offline režim)
+                button.innerText = "⏳";
+                try {
+                    const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
+                    const data = await response.json();
+                    if (data.meals && data.meals[0]) {
+                        const rawMeal = data.meals[0];
+                        // Pokus o překlad receptu před uložením
+                        let finalMeal = await translateRecipe(rawMeal);
+                        
+                        // Fallback: Pokud překlad selhal nebo vrátil chybu, sestavíme bezpečný EN fallback objekt
+                        if (!finalMeal) {
+                            const extractedIngredients = [];
+                            for (let i = 1; i <= 20; i++) {
+                                const ing = rawMeal[`strIngredient${i}`];
+                                const meas = rawMeal[`strMeasure${i}`];
+                                if (ing && ing.trim() !== "") {
+                                    extractedIngredients.push({ ingredient: ing.trim(), measure: meas ? meas.trim() : "" });
+                                }
+                            }
+                            finalMeal = {
+                                idMeal: rawMeal.idMeal,
+                                strMeal: rawMeal.strMeal,
+                                strMealThumb: rawMeal.strMealThumb,
+                                strCategory: rawMeal.strCategory || "Unknown",
+                                strArea: rawMeal.strArea || "Unknown",
+                                strInstructions: rawMeal.strInstructions || "",
+                                extractedIngredients
+                            };
+                        }
+                        
+                        favourites.push(finalMeal);
+                        localStorage.setItem('favourite_recipes', JSON.stringify(favourites));
+                        button.classList.add('is-favourite');
+                    }
+                } catch (err) {
+                    console.error("Nepodařilo se uložit recept do offline cache:", err);
+                } finally {
+                    button.innerText = "♥";
+                }
             }
-            localStorage.setItem('favourite_recipes', JSON.stringify(favourites));
         });
     });
 }
 
+// --- DETAIL RECEPTU S FAILLBACKEM A RYCHLOSTNÍ POJISTKOU ---
 async function openRecipeDetail(idMeal) {
-    modalBody.innerHTML = '<p class="loading-text">Načítám postup přípravy...</p>';
+    modalBody.innerHTML = '<p class="loading-text">Načítám a připravuji recept...</p>';
     recipeModal.style.display = "block";
 
     try {
-        const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
-        const data = await response.json();
-        const meal = data.meals[0];
+        // Podíváme se, jestli už recept nemáme uložený (a přeložený) v oblíbených
+        const favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
+        const cachedCzechMeal = favourites.find(fav => fav.idMeal === idMeal);
 
-        let ingredientsHTML = '';
-        for (let i = 1; i <= 20; i++) {
-            const ingredient = meal[`strIngredient${i}`];
-            const measure = meal[`strMeasure${i}`];
-            if (ingredient && ingredient.trim() !== "") {
-                ingredientsHTML += `<li>${ingredient} - <small>${measure}</small></li>`;
+        let mealToDisplay = null;
+
+        if (cachedCzechMeal && cachedCzechMeal.extractedIngredients) {
+            mealToDisplay = cachedCzechMeal;
+        } else {
+            const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
+            const data = await response.json();
+            if (!data.meals || !data.meals[0]) throw new Error("Recept nenalezen");
+            
+            const rawMeal = data.meals[0];
+            
+            // Zkusíme přeložit (vnitřní funkce má zabudovaný timeout na 3 vteřiny)
+            mealToDisplay = await translateRecipe(rawMeal);
+            
+            // FALLBACK: Pokud překlad trval moc dlouho nebo selhal, použijeme bleskový anglický základ
+            if (!mealToDisplay) {
+                const extractedIngredients = [];
+                for (let i = 1; i <= 20; i++) {
+                    const ing = rawMeal[`strIngredient${i}`];
+                    const meas = rawMeal[`strMeasure${i}`];
+                    if (ing && ing.trim() !== "") {
+                        extractedIngredients.push({ ingredient: ing.trim(), measure: meas ? meas.trim() : "" });
+                    }
+                }
+                mealToDisplay = {
+                    idMeal: rawMeal.idMeal,
+                    strMeal: rawMeal.strMeal,
+                    strMealThumb: rawMeal.strMealThumb,
+                    strCategory: (rawMeal.strCategory || 'Neznámá') + " (EN)",
+                    strArea: (rawMeal.strArea || 'Neznámá') + " (EN)",
+                    strInstructions: rawMeal.strInstructions,
+                    extractedIngredients
+                };
             }
         }
 
+        // Vygenerování HTML pro ingredience
+        let ingredientsHTML = '';
+        mealToDisplay.extractedIngredients.forEach(item => {
+            ingredientsHTML += `<li>${item.ingredient} - <small>${item.measure}</small></li>`;
+        });
+
         modalBody.innerHTML = `
             <div class="modal-recipe-header">
-                <img src="${meal.strMealThumb}" alt="${meal.strMeal}">
-                <h2>${meal.strMeal}</h2>
-                <p><strong>Kategorie:</strong> ${meal.strCategory || 'Neznámá'} | <strong>Oblast:</strong> ${meal.strArea || 'Neznámá'}</p>
+                <img src="${mealToDisplay.strMealThumb}" alt="${mealToDisplay.strMeal}">
+                <h2>${mealToDisplay.strMeal}</h2>
+                <p><strong>Kategorie:</strong> ${mealToDisplay.strCategory} | <strong>Oblast:</strong> ${mealToDisplay.strArea}</p>
             </div>
             <div class="modal-recipe-content">
                 <h3>Co budete potřebovat:</h3>
                 <ul>${ingredientsHTML}</ul>
                 
                 <h3>Postup přípravy:</h3>
-                <p class="recipe-instructions">${meal.strInstructions.replace(/\n/g, '<br>')}</p>
+                <p class="recipe-instructions">${mealToDisplay.strInstructions.replace(/\n/g, '<br>')}</p>
             </div>
             <hr>
             <div class="comments-section">
@@ -784,6 +951,7 @@ async function openRecipeDetail(idMeal) {
     }
 }
 
+// === SPRÁVA POZNÁMEK A KOMENTÁŘŮ ===
 function loadComments(idMeal) {
     const commentsList = document.getElementById('commentsList');
     const allComments = JSON.parse(localStorage.getItem('recipe_comments')) || {};

@@ -514,6 +514,29 @@ body {
     border-color: #e67e22;
 }
 
+/* Tlačítko pro odeslání komentáře */
+.btn-comment {
+    background-color: #e67e22;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    display: block;
+    margin-left: auto; /* Posune tlačítko doprava pod textarea */
+}
+
+.btn-comment:hover {
+    background-color: #d35400;
+}
+
+.btn-comment:active {
+    transform: scale(0.98);
+}
+
 /* Tlačítko na smazání komentáře */
 .btn-delete-comment {
     background: none;
@@ -702,7 +725,9 @@ body {
 
 
 /* --- Styly pro stránku Resources.html (Mobilní přísady) --- */
-
+.mobile-only {
+    display: none;
+}
 
 .resources-page {
     display: flex;
