@@ -800,6 +800,12 @@ body {
     border: 2px solid #ff4d4d !important;
 }
 
+@media (max-width: 767px) {
+    .form-row {
+        flex-wrap: wrap;
+    }
+}
+
 
 /* --- Styly pro stránku Resources.html (Mobilní přísady) --- */
 .resources-page {

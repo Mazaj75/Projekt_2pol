@@ -1,4 +1,4 @@
-// === HTML ELEMENTY ===
+// HTML ELEMENTY
 const ingredientInput = document.getElementById('ingredientInput') || document.getElementById('mobileIngredientInput');
 const ingredientsList = document.getElementById('ingredientsList') || document.getElementById('mobileIngredientsList');
 const expirationDay = document.getElementById('dateOfExpirationDay');
@@ -14,7 +14,7 @@ const recipeModal = document.getElementById('recipeModal');
 const modalBody = document.getElementById('modalRecipeBody');
 const closeModalBtn = document.querySelector('.close-modal');
 
-// Naše lokální databáze ingrediencí: dvojice { czech: "...", english: "..." }
+// lokální databáze ingrediencí: dvojice { czech: "...", english: "..." }
 let localIngredientsDb = [];
 let isDbReady = false;
 
@@ -281,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const newsletterForm = document.getElementById('newsletterForm');
     const successMessage = document.getElementById('successMessage');
 
+    //newsletter
     if (newsletterForm) {
         newsletterForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -361,12 +362,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- POMOCNÁ FUNKCE: Odstranění diakritiky ---
+// POMOCNÁ FUNKCE: Odstranění diakritiky
 function removeAccents(text) {
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// --- POMOCNÁ FUNKCE: Překlad textu přes MyMemory API s Timeoutem (max 3 vteřiny) ---
+// POMOCNÁ FUNKCE: Překlad textu přes MyMemory API s Timeoutem (max 3 vteřiny) 
 async function translateText(text, fromLang, toLang) {
     if (!text || text.trim() === "") return "";
     
@@ -392,7 +393,7 @@ async function translateText(text, fromLang, toLang) {
     }
 }
 
-// --- BEZPEČNÝ CHUNKOVANÝ PŘEKLAD CELÉHO RECEPTU ---
+// CHUNKOVANÝ PŘEKLAD CELÉHO RECEPTU
 async function translateRecipe(meal) {
     try {
         // 1. Překlad základních metadat
@@ -484,7 +485,7 @@ async function translateRecipe(meal) {
     }
 }
 
-// --- INICIALIZACE DATABÁZE (CACHE) ---
+// INICIALIZACE DATABÁZE (CACHE)
 async function initIngredientsDatabase() {
     localIngredientsDb = translatedIngredientsToCzech;
     isDbReady = true;
@@ -494,7 +495,7 @@ async function initIngredientsDatabase() {
     }
 }
 
-// --- POMOCNÁ FUNKCE: Výpočet Levenshteinovy vzdálenosti slov ---
+// POMOCNÁ FUNKCE: Výpočet Levenshteinovy vzdálenosti slov 
 function getLevenshteinDistance(a, b) {
     const cleanA = removeAccents(a.toLowerCase());
     const cleanB = removeAccents(b.toLowerCase());
@@ -519,7 +520,7 @@ function getLevenshteinDistance(a, b) {
     return matrix[cleanB.length][cleanA.length];
 }
 
-// --- KONTROLA A OPRAVA V ČESKÉM JAZYCE ---
+// KONTROLA A OPRAVA V ČESKÉM JAZYCE 
 function checkAndValidateCzechIngredient(userInput) {
     const cleanUser = removeAccents(userInput.toLowerCase().trim());
     if (!cleanUser) return null;
@@ -811,7 +812,7 @@ function displayRecipes(meals) {
                 }
                 localStorage.setItem('favourite_recipes', JSON.stringify(favourites));
             } else {
-                // Přidávání do oblíbených (Uloží přeloženou nebo záložní EN verzi pro offline režim)
+                // Přidávání do oblíbených uloží přeloženou nebo záložní EN verzi pro offline režim
                 button.innerText = "⏳";
                 try {
                     const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
@@ -821,7 +822,7 @@ function displayRecipes(meals) {
                         // Pokus o překlad receptu před uložením
                         let finalMeal = await translateRecipe(rawMeal);
                         
-                        // Fallback: Pokud překlad selhal nebo vrátil chybu, sestavíme bezpečný EN fallback objekt
+                        // Pokud překlad selhal nebo vrátil chybu, sestavíme bezpečný EN fallback objekt
                         if (!finalMeal) {
                             const extractedIngredients = [];
                             for (let i = 1; i <= 20; i++) {
@@ -856,13 +857,13 @@ function displayRecipes(meals) {
     });
 }
 
-// --- DETAIL RECEPTU S FAILLBACKEM A RYCHLOSTNÍ POJISTKOU ---
+// DETAIL RECEPTU S FAILLBACKEM A RYCHLOSTNÍ POJISTKOU
 async function openRecipeDetail(idMeal) {
     modalBody.innerHTML = '<p class="loading-text">Načítám a připravuji recept...</p>';
     recipeModal.style.display = "block";
 
     try {
-        // Podíváme se, jestli už recept nemáme uložený (a přeložený) v oblíbených
+        // Podíváme se, jestli už recept není uložený v oblíbených
         const favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
         const cachedCzechMeal = favourites.find(fav => fav.idMeal === idMeal);
 
@@ -877,10 +878,10 @@ async function openRecipeDetail(idMeal) {
             
             const rawMeal = data.meals[0];
             
-            // Zkusíme přeložit (vnitřní funkce má zabudovaný timeout na 3 vteřiny)
+            // Zkusí přeložit tm. 3s
             mealToDisplay = await translateRecipe(rawMeal);
             
-            // FALLBACK: Pokud překlad trval moc dlouho nebo selhal, použijeme bleskový anglický základ
+            // Pokud překlad trval moc dlouho nebo selhal použije se anglický základ
             if (!mealToDisplay) {
                 const extractedIngredients = [];
                 for (let i = 1; i <= 20; i++) {
@@ -951,7 +952,7 @@ async function openRecipeDetail(idMeal) {
     }
 }
 
-// === SPRÁVA POZNÁMEK A KOMENTÁŘŮ ===
+// SPRÁVA POZNÁMEK A KOMENTÁŘŮ 
 function loadComments(idMeal) {
     const commentsList = document.getElementById('commentsList');
     const allComments = JSON.parse(localStorage.getItem('recipe_comments')) || {};
