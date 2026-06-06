@@ -1,24 +1,21 @@
-// HTML ELEMENTY
-const ingredientInput = document.getElementById('ingredientInput') || document.getElementById('mobileIngredientInput');
-const ingredientsList = document.getElementById('ingredientsList') || document.getElementById('mobileIngredientsList');
-const expirationDay = document.getElementById('dateOfExpirationDay');
-const expirationMonth = document.getElementById('dateOfExpirationMonth');
-const expirationYear = document.getElementById('dateOfExpirationYear');
-const addBtn = document.getElementById('addBtn');
-const recipesGrid = document.querySelector('.recipes-grid');
-const loadingOverlay = document.getElementById('loadingOverlay');
-const loadingText = document.getElementById('loadingText');
+/* ==============================================
+   HTML ELEMENTY
+   ============================================== */
+const ingredientInput  = document.getElementById('ingredientInput') || document.getElementById('mobileIngredientInput');
+const ingredientsList  = document.getElementById('ingredientsList')  || document.getElementById('mobileIngredientsList');
+const expirationDay    = document.getElementById('dateOfExpirationDay');
+const expirationMonth  = document.getElementById('dateOfExpirationMonth');
+const expirationYear   = document.getElementById('dateOfExpirationYear');
+const addBtn           = document.getElementById('addBtn');
+const recipesGrid      = document.querySelector('.recipes-grid');
+const recipeModal      = document.getElementById('recipeModal');
+const modalBody        = document.getElementById('modalRecipeBody');
+const closeModalBtn    = document.querySelector('.close-modal');
 
-// Prvky vyskakovacího okna (modalu)
-const recipeModal = document.getElementById('recipeModal');
-const modalBody = document.getElementById('modalRecipeBody');
-const closeModalBtn = document.querySelector('.close-modal');
-
-// lokální databáze ingrediencí: dvojice { czech: "...", english: "..." }
-let localIngredientsDb = [];
-let isDbReady = false;
-
-const translatedIngredientsToCzech = [
+/* ==============================================
+   LOKÁLNÍ SLOVNÍK INGREDIENCÍ (CS ↔ EN)
+   ============================================== */
+const INGREDIENTS_DB = [
     { czech: "kuře", english: "chicken" },
     { czech: "losos", english: "salmon" },
     { czech: "hovězí maso", english: "beef" },
@@ -231,7 +228,6 @@ const translatedIngredientsToCzech = [
     { czech: "hrubá mouka", english: "coarse flour" },
     { czech: "nízkotučné mléko", english: "semi-skimmed milk" },
     { czech: "plnotučné mléko", english: "whole milk" },
-    { czech: "javorový sirup", english: "maple syrup" },
     { czech: "muškátový květ", english: "mace" },
     { czech: "panko strouhanka", english: "panko breadcrumbs" },
     { czech: "strouhanka", english: "breadcrumbs" },
@@ -244,7 +240,6 @@ const translatedIngredientsToCzech = [
     { czech: "rýžový ocet", english: "rice vinegar" },
     { czech: "sezamový olej", english: "sesame oil" },
     { czech: "šalotky", english: "shallots" },
-    { czech: "sójová omáčka", english: "dark soy sauce" },
     { czech: "světlá sójová omáčka", english: "light soy sauce" },
     { czech: "třtinový cukr", english: "raw sugar" },
     { czech: "moučkový cukr", english: "icing sugar" },
@@ -257,11 +252,21 @@ const translatedIngredientsToCzech = [
     { czech: "strouhaný kokos", english: "desiccated coconut" },
     { czech: "kondenzované mléko", english: "condensed milk" },
     { czech: "odtučněné mléko", english: "skimmed milk" },
-    { czech: "sušené mléko", english: "milk powder" }
+    { czech: "sušené mléko", english: "milk powder" },
+    { czech: "sójová omáčka tmavá", english: "dark soy sauce" }
 ];
 
+// Předpočítané mapy pro O(1) vyhledávání (místo opakovaného .find() přes celé pole)
+const czechToEnglishMap = new Map(INGREDIENTS_DB.map(i => [i.czech.toLowerCase(), i.english]));
+const englishToCzechMap = new Map(INGREDIENTS_DB.map(i => [i.english.toLowerCase(), i.czech]));
+
+/* ==============================================
+   INICIALIZACE
+   ============================================== */
 document.addEventListener('DOMContentLoaded', () => {
-    initIngredientsDatabase();
+    // Skrytí loading overlaye — DB je lokální, žádné async načítání není potřeba
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) loadingOverlay.style.display = 'none';
 
     if (ingredientsList) {
         loadIngredients();
@@ -270,294 +275,245 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (addBtn) addBtn.addEventListener('click', addIngredient);
-    
+
     if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => recipeModal.style.display = "none");
+        closeModalBtn.addEventListener('click', () => recipeModal.style.display = 'none');
     }
     window.addEventListener('click', (e) => {
-        if (e.target === recipeModal) recipeModal.style.display = "none";
+        if (e.target === recipeModal) recipeModal.style.display = 'none';
     });
 
-    const newsletterForm = document.getElementById('newsletterForm');
-    const successMessage = document.getElementById('successMessage');
-
-    //newsletter
-    if (newsletterForm) {
-        newsletterForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-
-            const firstName = document.getElementById('firstName');
-            const lastName = document.getElementById('lastName');
-            const email = document.getElementById('email');
-            const birthYear = document.getElementById('birthYear');
-            const gdprConsent = document.getElementById('gdprConsent');
-
-            const firstNameError = document.getElementById('firstNameError');
-            const lastNameError = document.getElementById('lastNameError');
-            const emailError = document.getElementById('emailError');
-            const birthYearError = document.getElementById('birthYearError');
-            const gdprError = document.getElementById('gdprError');
-
-            let isValid = true;
-
-            function validateField(inputElement, errorElement, condition) {
-                if (condition) {
-                    errorElement.style.display = 'none';
-                    inputElement.classList.remove('input-error');
-                } else {
-                    errorElement.style.display = 'block';
-                    inputElement.classList.add('input-error');
-                    isValid = false;
-                }
-            }
-
-            validateField(firstName, firstNameError, firstName.value.trim() !== '');
-            validateField(lastName, lastNameError, lastName.value.trim() !== '');
-
-            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            validateField(email, emailError, emailPattern.test(email.value.trim()));
-
-            const yearValue = parseInt(birthYear.value, 10);
-            validateField(birthYear, birthYearError, !isNaN(yearValue) && yearValue >= 1920 && yearValue <= 2026);
-
-            if (gdprConsent.checked) {
-                gdprError.style.display = 'none';
-            } else {
-                gdprError.style.display = 'block';
-                isValid = false;
-            }
-
-            if (isValid) {
-                const selectedPreferences = [];
-                const preferenceCheckboxes = document.querySelectorAll('input[name="preference"]:checked');
-                preferenceCheckboxes.forEach(checkbox => {
-                    selectedPreferences.push(checkbox.value);
-                });
-
-                const subscriberData = {
-                    id: Date.now(),
-                    firstName: firstName.value.trim(),
-                    lastName: lastName.value.trim(),
-                    email: email.value.trim().toLowerCase(),
-                    birthYear: yearValue,
-                    preferences: selectedPreferences,
-                    date: new Date().toLocaleDateString('cs-CZ')
-                };
-
-                const currentSubscribers = JSON.parse(localStorage.getItem('newsletter_subscribers')) || [];
-                const emailExists = currentSubscribers.some(sub => sub.email === subscriberData.email);
-                
-                if (emailExists) {
-                    alert('Tento e-mail už je k odběru novinek přihlášen.');
-                    return;
-                }
-
-                currentSubscribers.push(subscriberData);
-                localStorage.setItem('newsletter_subscribers', JSON.stringify(currentSubscribers));
-
-                newsletterForm.style.display = 'none';
-                successMessage.style.display = 'block';
-            }
-        });
-    }
+    initNewsletterForm();
 });
 
-// POMOCNÁ FUNKCE: Odstranění diakritiky
-function removeAccents(text) {
-    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
+/* ==============================================
+   NEWSLETTER
+   ============================================== */
+function initNewsletterForm() {
+    const newsletterForm  = document.getElementById('newsletterForm');
+    const successMessage  = document.getElementById('successMessage');
+    if (!newsletterForm) return;
 
-// POMOCNÁ FUNKCE: Překlad textu přes MyMemory API s Timeoutem (max 3 vteřiny) 
-async function translateText(text, fromLang, toLang) {
-    if (!text || text.trim() === "") return "";
-    
-    // Vytvoříme timeout, aby překlad netrval věčně
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 vteřiny limit
+    newsletterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
 
-    try {
-        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${fromLang}|${toLang}`, {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        const data = await res.json();
-        
-        if (data.responseData && data.responseData.translatedText) {
-            return data.responseData.translatedText.trim();
+        const fields = {
+            firstName: { el: document.getElementById('firstName'),   err: document.getElementById('firstNameError'),  check: v => v.trim() !== '' },
+            lastName:  { el: document.getElementById('lastName'),    err: document.getElementById('lastNameError'),   check: v => v.trim() !== '' },
+            email:     { el: document.getElementById('email'),       err: document.getElementById('emailError'),      check: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) },
+            birthYear: { el: document.getElementById('birthYear'),   err: document.getElementById('birthYearError'),  check: v => { const y = parseInt(v, 10); return !isNaN(y) && y >= 1920 && y <= 2026; } },
+        };
+
+        let isValid = true;
+
+        for (const { el, err, check } of Object.values(fields)) {
+            const ok = check(el.value);
+            err.style.display   = ok ? 'none'  : 'block';
+            el.classList.toggle('input-error', !ok);
+            if (!ok) isValid = false;
         }
-        return text;
-    } catch (err) {
-        clearTimeout(timeoutId);
-        console.warn("Překlad vypršel nebo selhal, vracím původní text:", err);
-        return text; 
-    }
+
+        const gdprConsent = document.getElementById('gdprConsent');
+        const gdprError   = document.getElementById('gdprError');
+        if (!gdprConsent.checked) {
+            gdprError.style.display = 'block';
+            isValid = false;
+        } else {
+            gdprError.style.display = 'none';
+        }
+
+        if (!isValid) return;
+
+        const preferences = [...document.querySelectorAll('input[name="preference"]:checked')].map(cb => cb.value);
+        const subscriberData = {
+            id:         Date.now(),
+            firstName:  fields.firstName.el.value.trim(),
+            lastName:   fields.lastName.el.value.trim(),
+            email:      fields.email.el.value.trim().toLowerCase(),
+            birthYear:  parseInt(fields.birthYear.el.value, 10),
+            preferences,
+            date:       new Date().toLocaleDateString('cs-CZ')
+        };
+
+        const subscribers = getFromStorage('newsletter_subscribers');
+        if (subscribers.some(s => s.email === subscriberData.email)) {
+            alert('Tento e-mail už je k odběru novinek přihlášen.');
+            return;
+        }
+
+        subscribers.push(subscriberData);
+        saveToStorage('newsletter_subscribers', subscribers);
+
+        newsletterForm.style.display = 'none';
+        successMessage.style.display = 'block';
+    });
 }
 
-// CHUNKOVANÝ PŘEKLAD CELÉHO RECEPTU
+/* ==============================================
+   HELPERS — LocalStorage
+   ============================================== */
+function getFromStorage(key) {
+    try { return JSON.parse(localStorage.getItem(key)) || []; }
+    catch { return []; }
+}
+
+function saveToStorage(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+/* ==============================================
+   HELPERS — Řetězce
+   ============================================== */
+function removeAccents(text) {
+    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeStr(str) {
+    return removeAccents(str.toLowerCase().trim());
+}
+
+/* ==============================================
+   PŘEKLAD — pouze přes lokální slovník
+   (API odmítalo překládat větší objemy textu)
+   ============================================== */
+function translateWithApi(text, fromLang, toLang) {
+    if (!text || !text.trim()) return Promise.resolve('');
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 3000);
+    return fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${fromLang}|${toLang}`,
+        { signal: controller.signal }
+    )
+        .then(res => res.json())
+        .then(data => { clearTimeout(timeoutId); return data?.responseData?.translatedText?.trim() || text; })
+        .catch(() => { clearTimeout(timeoutId); return text; });
+}
+
+/* Extrakce ingrediencí z raw meal objektu (EN) */
+function extractRawIngredients(meal) {
+    const result = [];
+    for (let i = 1; i <= 20; i++) {
+        const ing  = meal[`strIngredient${i}`];
+        const meas = meal[`strMeasure${i}`];
+        if (ing && ing.trim()) result.push({ ingredient: ing.trim(), measure: meas ? meas.trim() : '' });
+    }
+    return result;
+}
+
+/* Přeloží ingredience přes lokální slovník, zbytek přes API */
+async function translateIngredients(rawIngredients) {
+    return Promise.all(rawIngredients.map(async ({ ingredient, measure }) => {
+        const localCz = englishToCzechMap.get(ingredient.toLowerCase());
+        const czIng   = localCz || await translateWithApi(ingredient, 'en', 'cs');
+        const czMeas  = measure ? await translateWithApi(measure, 'en', 'cs') : '';
+        return { ingredient: czIng, measure: czMeas };
+    }));
+}
+
+/* Přeloží celý recept — metadata + postup po větách */
 async function translateRecipe(meal) {
     try {
-        // 1. Překlad základních metadat
-        const metaPackage = [
-            meal.strMeal,
-            meal.strCategory || "Neznámá",
-            meal.strArea || "Neznámá"
-        ].join(" ||| ");
-        
-        const translatedMeta = await translateText(metaPackage, 'en', 'cs');
-        const metaParts = translatedMeta.split(/\s*\|\|\|\s*/);
-        
-        const strMeal = metaParts[0] || meal.strMeal;
-        const strCategory = metaParts[1] || "Neznámá";
-        const strArea = metaParts[2] || "Neznámá";
+        const [strMeal, strCategory, strArea] = (
+            await translateWithApi([meal.strMeal, meal.strCategory || 'Neznámá', meal.strArea || 'Neznámá'].join(' ||| '), 'en', 'cs')
+        ).split(/\s*\|\|\|\s*/);
 
-        // 2. Bezpečné kouskování postupu po větách (Max 400 znaků na dávku)
-        let strInstructions = "";
+        let strInstructions = '';
         if (meal.strInstructions) {
             const sentences = meal.strInstructions.split(/(?<=[.!?])\s+/);
-            let currentChunk = "";
-            const translatedChunks = [];
-
-            for (const sentence of sentences) {
-                if ((currentChunk + " " + sentence).length > 400) {
-                    if (currentChunk.trim()) {
-                        const trans = await translateText(currentChunk.trim(), 'en', 'cs');
-                        translatedChunks.push(trans);
-                    }
-                    currentChunk = sentence;
+            const chunks    = [];
+            let   current   = '';
+            for (const s of sentences) {
+                if ((current + ' ' + s).length > 400) {
+                    if (current.trim()) chunks.push(await translateWithApi(current.trim(), 'en', 'cs'));
+                    current = s;
                 } else {
-                    currentChunk += (currentChunk ? " " : "") + sentence;
+                    current += (current ? ' ' : '') + s;
                 }
             }
-            if (currentChunk.trim()) {
-                const trans = await translateText(currentChunk.trim(), 'en', 'cs');
-                translatedChunks.push(trans);
-            }
-            strInstructions = translatedChunks.join(" ");
+            if (current.trim()) chunks.push(await translateWithApi(current.trim(), 'en', 'cs'));
+            strInstructions = chunks.join(' ');
         }
 
-        // 3. Extrakce a překlad ingrediencí a jednotek
-        const rawIngredients = [];
-        const rawMeasures = [];
-        const extractedIngredients = [];
-
-        for (let i = 1; i <= 20; i++) {
-            const ing = meal[`strIngredient${i}`];
-            const meas = meal[`strMeasure${i}`];
-            if (ing && ing.trim() !== "") {
-                rawIngredients.push(ing.trim());
-                rawMeasures.push(meas ? meas.trim() : "");
-            }
-        }
-
-        let translatedIngredients = [];
-        if (rawIngredients.length > 0) {
-            const ingTrans = await translateText(rawIngredients.join(" ||| "), 'en', 'cs');
-            translatedIngredients = ingTrans.split(/\s*\|\|\|\s*/);
-        }
-
-        let translatedMeasures = [];
-        if (rawMeasures.length > 0) {
-            const measTrans = await translateText(rawMeasures.join(" ||| "), 'en', 'cs');
-            translatedMeasures = measTrans.split(/\s*\|\|\|\s*/);
-        }
-
-        for (let i = 0; i < rawIngredients.length; i++) {
-            // Zkusíme najít překlad v našem lokálním spolehlivém slovníku
-            const localMatch = localIngredientsDb.find(item => item.english.toLowerCase() === rawIngredients[i].toLowerCase());
-            const czIng = localMatch ? localMatch.czech : (translatedIngredients[i] || rawIngredients[i]);
-            const czMeas = translatedMeasures[i] || rawMeasures[i] || "";
-            
-            extractedIngredients.push({ ingredient: czIng, measure: czMeas });
-        }
+        const rawIngredients       = extractRawIngredients(meal);
+        const extractedIngredients = await translateIngredients(rawIngredients);
 
         return {
             idMeal: meal.idMeal,
-            strMeal,
+            strMeal:      strMeal      || meal.strMeal,
             strMealThumb: meal.strMealThumb,
-            strCategory,
-            strArea,
+            strCategory:  strCategory  || 'Neznámá',
+            strArea:      strArea      || 'Neznámá',
             strInstructions,
             extractedIngredients
         };
     } catch (e) {
-        console.error("Vnitřní chyba překladače, vracím původní EN data:", e);
+        console.error('Chyba překladače, vracím EN data:', e);
         return null;
     }
 }
 
-// INICIALIZACE DATABÁZE (CACHE)
-async function initIngredientsDatabase() {
-    localIngredientsDb = translatedIngredientsToCzech;
-    isDbReady = true;
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    if (loadingOverlay) {
-        loadingOverlay.style.display = 'none';
-    }
+/* EN záložní objekt (pokud překlad selže) */
+function buildFallbackMeal(rawMeal, labelSuffix = '') {
+    return {
+        idMeal:       rawMeal.idMeal,
+        strMeal:      rawMeal.strMeal,
+        strMealThumb: rawMeal.strMealThumb,
+        strCategory:  (rawMeal.strCategory || 'Unknown') + labelSuffix,
+        strArea:      (rawMeal.strArea      || 'Unknown') + labelSuffix,
+        strInstructions: rawMeal.strInstructions || '',
+        extractedIngredients: extractRawIngredients(rawMeal)
+    };
 }
 
-// POMOCNÁ FUNKCE: Výpočet Levenshteinovy vzdálenosti slov 
-function getLevenshteinDistance(a, b) {
-    const cleanA = removeAccents(a.toLowerCase());
-    const cleanB = removeAccents(b.toLowerCase());
-
-    const matrix = [];
-    for (let i = 0; i <= cleanB.length; i++) matrix[i] = [i];
-    for (let j = 0; j <= cleanA.length; j++) matrix[0][j] = j;
-
-    for (let i = 1; i <= cleanB.length; i++) {
-        for (let j = 1; j <= cleanA.length; j++) {
-            if (cleanB.charAt(i - 1) === cleanA.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
-            }
+/* ==============================================
+   LEVENSHTEIN — oprava překlepy v CS vstupu
+   ============================================== */
+function levenshtein(a, b) {
+    const ca = normalizeStr(a), cb = normalizeStr(b);
+    const m  = [];
+    for (let i = 0; i <= cb.length; i++) m[i] = [i];
+    for (let j = 0; j <= ca.length; j++) m[0][j] = j;
+    for (let i = 1; i <= cb.length; i++) {
+        for (let j = 1; j <= ca.length; j++) {
+            m[i][j] = cb[i-1] === ca[j-1]
+                ? m[i-1][j-1]
+                : 1 + Math.min(m[i-1][j-1], m[i][j-1], m[i-1][j]);
         }
     }
-    return matrix[cleanB.length][cleanA.length];
+    return m[cb.length][ca.length];
 }
 
-// KONTROLA A OPRAVA V ČESKÉM JAZYCE 
 function checkAndValidateCzechIngredient(userInput) {
-    const cleanUser = removeAccents(userInput.toLowerCase().trim());
+    const cleanUser = normalizeStr(userInput);
     if (!cleanUser) return null;
 
-    const exactMatch = localIngredientsDb.find(item => removeAccents(item.czech.toLowerCase()) === cleanUser);
-    if (exactMatch) {
-        return exactMatch.czech; 
+    // Přesná shoda přes předpočítanou mapu
+    for (const item of INGREDIENTS_DB) {
+        if (normalizeStr(item.czech) === cleanUser) return item.czech;
     }
 
-    let bestMatchItem = null;
-    let minDistance = 999;
-
-    localIngredientsDb.forEach(item => {
-        const distance = getLevenshteinDistance(cleanUser, item.czech);
-        if (distance < minDistance) {
-            minDistance = distance;
-            bestMatchItem = item;
-        }
-    });
-
-    if (bestMatchItem && minDistance <= 2 && cleanUser.charAt(0) === removeAccents(bestMatchItem.czech.toLowerCase()).charAt(0)) {
-        const confirmCorrection = confirm(`Ingredience „${userInput}“ nebyla nalezena.\nNemysleli jste: „${bestMatchItem.czech}“?`);
-        if (confirmCorrection) {
-            return bestMatchItem.czech;
-        }
-    } else {
-        const forceAdd = confirm(`Ingredience „${userInput}“ není v našem doporučeném seznamu receptů. Chcete ji přesto do lednice přidat?`);
-        if (forceAdd) {
-            return userInput; 
-        }
+    // Nejbližší shoda přes Levenshtein
+    let bestItem = null, minDist = 999;
+    for (const item of INGREDIENTS_DB) {
+        const d = levenshtein(cleanUser, item.czech);
+        if (d < minDist) { minDist = d; bestItem = item; }
     }
-    return null;
+
+    if (bestItem && minDist <= 2 && cleanUser[0] === normalizeStr(bestItem.czech)[0]) {
+        return confirm(`Ingredience „${userInput}" nebyla nalezena.\nNemysleli jste: „${bestItem.czech}"?`)
+            ? bestItem.czech : null;
+    }
+
+    return confirm(`Ingredience „${userInput}" není v našem seznamu. Chcete ji přesto přidat?`)
+        ? userInput : null;
 }
 
+/* ==============================================
+   OBLÍBENÉ RECEPTY (Favourites.html)
+   ============================================== */
 function loadFavouriteRecipes() {
     if (!recipesGrid) return;
-    const favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
+    const favourites = getFromStorage('favourite_recipes');
     if (favourites.length === 0) {
         recipesGrid.innerHTML = '<p class="empty-recipes-text">Zatím nemáte žádné oblíbené recepty.</p>';
         return;
@@ -565,10 +521,14 @@ function loadFavouriteRecipes() {
     displayRecipes(favourites);
 }
 
+/* ==============================================
+   SPRÁVA LEDNICE
+   ============================================== */
 function loadIngredients() {
-    const ingredients = JSON.parse(localStorage.getItem('fridge_ingredients')) || [];
+    if (!ingredientsList) return;
+    const ingredients = getFromStorage('fridge_ingredients');
     ingredientsList.innerHTML = '';
-    
+
     if (ingredients.length === 0) {
         ingredientsList.innerHTML = '<p class="empty-fridge-text">Lednice je prázdná</p>';
         if (recipesGrid) recipesGrid.innerHTML = '<p class="empty-recipes-text">Přidejte ingredience pro vyhledání receptů.</p>';
@@ -577,69 +537,55 @@ function loadIngredients() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     ingredients.forEach((item, index) => {
         const expiryDate = new Date(item.year, item.month - 1, item.day);
         expiryDate.setHours(0, 0, 0, 0);
         const isExpired = today > expiryDate;
 
         const itemDiv = document.createElement('div');
-        itemDiv.className = `fridge-item ${isExpired ? 'expired' : ''}`;
+        itemDiv.className = `fridge-item${isExpired ? ' expired' : ''}`;
         itemDiv.innerHTML = `
             <div class="fridge-item-summary">
-                <span class="item-name">${item.name} ${isExpired ? '⚠️' : ''}</span>
+                <span class="item-name">${item.name}${isExpired ? ' ⚠️' : ''}</span>
             </div>
             <div class="fridge-item-details">
                 <span class="item-expiry">Exp: ${item.day}.${item.month}.${item.year}</span>
                 <button class="btn-delete" data-index="${index}">❌</button>
-            </div>
-        `;
-        
+            </div>`;
+
         itemDiv.addEventListener('click', (e) => {
             if (e.target.classList.contains('btn-delete')) return;
-            toggleIngredientDetails(itemDiv);
+            itemDiv.querySelector('.fridge-item-details').classList.toggle('active');
         });
 
         ingredientsList.appendChild(itemDiv);
     });
 
-    document.querySelectorAll('.btn-delete').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const indexToDelete = e.target.getAttribute('data-index');
-            deleteIngredient(indexToDelete);
-        });
+    ingredientsList.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => deleteIngredient(e.target.dataset.index));
     });
 
     fetchRecipes(ingredients);
 }
 
-function toggleIngredientDetails(itemDiv) {
-    const details = itemDiv.querySelector('.fridge-item-details');
-    details.classList.toggle('active');
-}
-
 function addIngredient() {
-    if (!isDbReady) {
-        alert('Počkejte prosím na dokončení přípravy databáze ingrediencí.');
-        return;
-    }
+    const rawName   = ingredientInput?.value.trim();
+    const dayStr    = expirationDay?.value.trim();
+    const monthStr  = expirationMonth?.value.trim();
+    const yearStr   = expirationYear?.value.trim();
 
-    const rawName = ingredientInput.value.trim();
-    const dayStr = expirationDay.value.trim();
-    const monthStr = expirationMonth.value.trim();
-    const yearStr = expirationYear.value.trim();
-    
     if (!rawName || !dayStr || !monthStr || !yearStr) {
         alert('Prosím, vyplňte název ingredience i celé datum expirace.');
         return;
     }
 
     const validatedName = checkAndValidateCzechIngredient(rawName);
-    if (!validatedName) return; 
+    if (!validatedName) return;
 
-    const day = parseInt(dayStr, 10);
+    const day   = parseInt(dayStr,   10);
     const month = parseInt(monthStr, 10);
-    const year = parseInt(yearStr, 10);
+    const year  = parseInt(yearStr,  10);
 
     if (month < 1 || month > 12 || year < 1 || year > 9999) {
         alert('Zkontrolujte rozsah měsíce a roku.');
@@ -647,280 +593,229 @@ function addIngredient() {
     }
 
     const testDate = new Date(year, month - 1, day);
-    if (testDate.getFullYear() !== year || (testDate.getMonth() + 1) !== month || testDate.getDate() !== day) {
+    if (testDate.getFullYear() !== year || testDate.getMonth() + 1 !== month || testDate.getDate() !== day) {
         alert(`Zadaný měsíc nemá ${day} dnů.`);
         return;
     }
-    
-    const newIngredient = { name: validatedName, day, month, year };
-    const ingredients = JSON.parse(localStorage.getItem('fridge_ingredients')) || [];
-    ingredients.push(newIngredient);
-    localStorage.setItem('fridge_ingredients', JSON.stringify(ingredients));
-    
+
+    const ingredients = getFromStorage('fridge_ingredients');
+    ingredients.push({ name: validatedName, day, month, year });
+    saveToStorage('fridge_ingredients', ingredients);
+
     ingredientInput.value = '';
-    expirationDay.value = '';
+    expirationDay.value   = '';
     expirationMonth.value = '';
-    expirationYear.value = '';
-    
+    expirationYear.value  = '';
+
     loadIngredients();
 }
 
 function deleteIngredient(index) {
-    const ingredients = JSON.parse(localStorage.getItem('fridge_ingredients')) || [];
-    ingredients.splice(index, 1);
-    localStorage.setItem('fridge_ingredients', JSON.stringify(ingredients));
+    const ingredients = getFromStorage('fridge_ingredients');
+    ingredients.splice(Number(index), 1);
+    saveToStorage('fridge_ingredients', ingredients);
     loadIngredients();
 }
 
+/* ==============================================
+   VYHLEDÁVÁNÍ RECEPTŮ
+   ============================================== */
 async function fetchRecipes(ingredients) {
     if (!recipesGrid) return;
     recipesGrid.innerHTML = '<p class="loading-text">Analyzuji vaši lednici bleskovou rychlostí...</p>';
-    
+
     try {
-        const fridgeEnglishNames = ingredients.map(ing => {
-            const match = localIngredientsDb.find(item => item.czech.toLowerCase() === ing.name.toLowerCase());
-            return match ? match.english.toLowerCase() : ing.name.toLowerCase();
-        });
+        // Přeložíme CS → EN pro dotaz na API, duplicitní suroviny odstraníme
+        const fridgeEnglishNames = [...new Set(
+            ingredients.map(ing => czechToEnglishMap.get(ing.name.toLowerCase()) || ing.name.toLowerCase())
+        )];
 
-        const searchPromises = fridgeEnglishNames.map(async (englishName) => {
-            try {
-                const res = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${englishName}`);
-                const data = await res.json();
-                return data.meals || [];
-            } catch (err) {
-                console.error("Chyba vyhledávání podle ingredience:", err);
-                return [];
-            }
-        });
+        // Paralelní hledání receptů dle každé ingredience
+        const searchResults = await Promise.all(
+            fridgeEnglishNames.map(en =>
+                fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${en}`)
+                    .then(r => r.json())
+                    .then(d => d.meals || [])
+                    .catch(() => [])
+            )
+        );
 
-        const searchResults = await Promise.all(searchPromises);
-        const uniqueMealIds = new Set();
-        searchResults.flat().forEach(meal => uniqueMealIds.add(meal.idMeal));
+        const uniqueIds = [...new Set(searchResults.flat().map(m => m.idMeal))];
 
-        if (uniqueMealIds.size === 0) {
+        if (uniqueIds.length === 0) {
             recipesGrid.innerHTML = '<p class="empty-recipes-text">Pro tyto ingredience nebyly nalezeny žádné recepty.</p>';
             return;
         }
 
-        const detailPromises = Array.from(uniqueMealIds).map(async (idMeal) => {
-            try {
-                const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
-                const data = await res.json();
-                if (!data.meals || !data.meals[0]) return null;
-                
-                const meal = data.meals[0];
-                let matchingIngredientsCount = 0;
+        // Detaily receptů + počítání shod s lednicí
+        const detailedRecipes = (await Promise.all(
+            uniqueIds.map(id =>
+                fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${id}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        const meal = d.meals?.[0];
+                        if (!meal) return null;
 
-                fridgeEnglishNames.forEach(fridgeIng => {
-                    let isIngredienceUsed = false;
-                    for (let i = 1; i <= 20; i++) {
-                        const recipeIng = meal[`strIngredient${i}`];
-                        if (recipeIng && recipeIng.trim() !== "") {
-                            const cleanRecipeIng = recipeIng.toLowerCase().trim();
-                            if (cleanRecipeIng.includes(fridgeIng) || fridgeIng.includes(cleanRecipeIng)) {
-                                isIngredienceUsed = true;
-                                break;
-                            }
+                        // Celkový počet ingrediencí receptu
+                        let totalCount = 0;
+                        for (let i = 1; i <= 20; i++) {
+                            if (meal[`strIngredient${i}`]?.trim()) totalCount++;
                         }
-                    }
-                    if (isIngredienceUsed) {
-                        matchingIngredientsCount++;
-                    }
-                });
 
-                return {
-                    idMeal: meal.idMeal,
-                    strMeal: meal.strMeal,
-                    strMealThumb: meal.strMealThumb,
-                    usedFridgeCount: matchingIngredientsCount
-                };
-            } catch (err) {
-                console.error("Chyba při stahování detailu receptu:", err);
-                return null;
-            }
-        });
+                        // Kolik ingrediencí receptu pokrývá lednice
+                        let matchCount = 0;
+                        for (let i = 1; i <= 20; i++) {
+                            const ri = meal[`strIngredient${i}`]?.toLowerCase().trim();
+                            if (!ri) continue;
+                            const covered = fridgeEnglishNames.some(fridgeIng =>
+                                ri.includes(fridgeIng) || fridgeIng.includes(ri)
+                            );
+                            if (covered) matchCount++;
+                        }
 
-        const detailedRecipes = (await Promise.all(detailPromises)).filter(recipe => recipe !== null);
-        detailedRecipes.sort((a, b) => b.usedFridgeCount - a.usedFridgeCount);
+                        return {
+                            idMeal: meal.idMeal,
+                            strMeal: meal.strMeal,
+                            strMealThumb: meal.strMealThumb,
+                            usedFridgeCount: matchCount,
+                            totalIngredients: totalCount,
+                            hasAll: totalCount > 0 && matchCount >= totalCount
+                        };
+                    })
+                    .catch(() => null)
+            )
+        )).filter(Boolean);
+
+        detailedRecipes.sort((a, b) => (b.hasAll - a.hasAll) || (b.usedFridgeCount - a.usedFridgeCount));
         displayRecipes(detailedRecipes);
 
-    } catch (globalError) {
-        console.error("Globální chyba při zpracování receptů:", globalError);
+    } catch (err) {
+        console.error('Chyba při načítání receptů:', err);
         recipesGrid.innerHTML = '<p class="empty-recipes-text">Došlo k chybě při načítání receptů.</p>';
     }
 }
 
+/* ==============================================
+   ZOBRAZENÍ KARET RECEPTŮ
+   ============================================== */
 function displayRecipes(meals) {
     if (!recipesGrid) return;
     recipesGrid.innerHTML = '';
 
-    if (meals.length === 0) {
+    if (!meals.length) {
         recipesGrid.innerHTML = '<p class="empty-recipes-text">Pro tyto ingredience nebyly nalezeny žádné recepty.</p>';
         return;
     }
 
-    const favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
+    const favourites = getFromStorage('favourite_recipes');
 
     meals.forEach(meal => {
-        const isFav = favourites.some(fav => fav.idMeal === meal.idMeal);
-        const card = document.createElement('div');
-        card.className = 'recipe-card';
-        
-        const countText = meal.usedFridgeCount !== undefined 
-            ? `Využije z lednice: <strong>${meal.usedFridgeCount}</strong> ${meal.usedFridgeCount === 1 ? 'surovinu' : (meal.usedFridgeCount >= 2 && meal.usedFridgeCount <= 4 ? 'suroviny' : 'surovin')}` 
-            : `Zobrazení z oblíbených`;
+        const isFav = favourites.some(f => f.idMeal === meal.idMeal);
+        const count = meal.usedFridgeCount;
+        let countText;
+        if (count === undefined) {
+            countText = 'Zobrazení z oblíbených';
+        } else if (meal.hasAll) {
+            countText = `✅ Máte všechny suroviny! (${count} z ${meal.totalIngredients})`;
+        } else {
+            countText = `Využije z lednice: <strong>${count}</strong> z ${meal.totalIngredients} ${count === 1 ? 'surovinu' : count >= 2 && count <= 4 ? 'suroviny' : 'surovin'}`;
+        }
 
+        const card = document.createElement('div');
+        card.className = `recipe-card${meal.hasAll ? ' has-all-ingredients' : ''}`;
         card.innerHTML = `
             <img src="${meal.strMealThumb}" alt="${meal.strMeal}" class="recipe-img">
             <div class="recipe-info">
                 <h4>${meal.strMeal}</h4>
-                <p class="recipe-ingredient-counter">${countText}</p>
+                <p class="recipe-ingredient-counter${meal.hasAll ? ' counter-complete' : ''}">${countText}</p>
                 <div class="recipe-meta">
                     <p class="recipe-category">ID: ${meal.idMeal}</p>
-                    <button class="btn-fav ${isFav ? 'is-favourite' : ''}" data-id="${meal.idMeal}" data-title="${meal.strMeal}" data-thumb="${meal.strMealThumb}">
-                        ♥
-                    </button>
+                    <button class="btn-fav ${isFav ? 'is-favourite' : ''}"
+                        data-id="${meal.idMeal}"
+                        data-title="${meal.strMeal}"
+                        data-thumb="${meal.strMealThumb}">♥</button>
                 </div>
-            </div>
-        `;
+            </div>`;
 
         card.addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-fav')) return;
-            openRecipeDetail(meal.idMeal);
+            if (!e.target.classList.contains('btn-fav')) openRecipeDetail(meal.idMeal);
         });
 
         recipesGrid.appendChild(card);
     });
 
-    // SPRÁVA TLAČÍTKA OBLÍBENÝCH S AUTOMATICKÝM UKLÁDÁNÍM PŘEKLADU DO CACHE
-    document.querySelectorAll('.btn-fav').forEach(btn => {
+    // Obsluha tlačítek oblíbených
+    recipesGrid.querySelectorAll('.btn-fav').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            const button = e.target;
-            const idMeal = button.getAttribute('data-id');
-            
-            let favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
-            const existingIndex = favourites.findIndex(fav => fav.idMeal === idMeal);
-            
-            if (existingIndex > -1) {
-                // Odebírání z oblíbených
-                favourites.splice(existingIndex, 1);
-                button.classList.remove('is-favourite');
+            const id   = btn.dataset.id;
+            const favs = getFromStorage('favourite_recipes');
+            const idx  = favs.findIndex(f => f.idMeal === id);
+
+            if (idx > -1) {
+                favs.splice(idx, 1);
+                btn.classList.remove('is-favourite');
                 if (!ingredientsList) {
-                    button.closest('.recipe-card').remove();
-                    if (favourites.length === 0) recipesGrid.innerHTML = '<p class="empty-recipes-text">Zatím nemáte žádné oblíbené recepty.</p>';
+                    btn.closest('.recipe-card').remove();
+                    if (!recipesGrid.querySelector('.recipe-card'))
+                        recipesGrid.innerHTML = '<p class="empty-recipes-text">Zatím nemáte žádné oblíbené recepty.</p>';
                 }
-                localStorage.setItem('favourite_recipes', JSON.stringify(favourites));
             } else {
-                // Přidávání do oblíbených uloží přeloženou nebo záložní EN verzi pro offline režim
-                button.innerText = "⏳";
+                btn.innerText = '⏳';
                 try {
-                    const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
-                    const data = await response.json();
-                    if (data.meals && data.meals[0]) {
-                        const rawMeal = data.meals[0];
-                        // Pokus o překlad receptu před uložením
-                        let finalMeal = await translateRecipe(rawMeal);
-                        
-                        // Pokud překlad selhal nebo vrátil chybu, sestavíme bezpečný EN fallback objekt
-                        if (!finalMeal) {
-                            const extractedIngredients = [];
-                            for (let i = 1; i <= 20; i++) {
-                                const ing = rawMeal[`strIngredient${i}`];
-                                const meas = rawMeal[`strMeasure${i}`];
-                                if (ing && ing.trim() !== "") {
-                                    extractedIngredients.push({ ingredient: ing.trim(), measure: meas ? meas.trim() : "" });
-                                }
-                            }
-                            finalMeal = {
-                                idMeal: rawMeal.idMeal,
-                                strMeal: rawMeal.strMeal,
-                                strMealThumb: rawMeal.strMealThumb,
-                                strCategory: rawMeal.strCategory || "Unknown",
-                                strArea: rawMeal.strArea || "Unknown",
-                                strInstructions: rawMeal.strInstructions || "",
-                                extractedIngredients
-                            };
-                        }
-                        
-                        favourites.push(finalMeal);
-                        localStorage.setItem('favourite_recipes', JSON.stringify(favourites));
-                        button.classList.add('is-favourite');
+                    const data   = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${id}`).then(r => r.json());
+                    const raw    = data.meals?.[0];
+                    if (raw) {
+                        const translated = await translateRecipe(raw);
+                        favs.push(translated || buildFallbackMeal(raw));
+                        btn.classList.add('is-favourite');
                     }
                 } catch (err) {
-                    console.error("Nepodařilo se uložit recept do offline cache:", err);
+                    console.error('Nepodařilo se uložit recept:', err);
                 } finally {
-                    button.innerText = "♥";
+                    btn.innerText = '♥';
                 }
             }
+
+            saveToStorage('favourite_recipes', favs);
         });
     });
 }
 
-// DETAIL RECEPTU S FAILLBACKEM A RYCHLOSTNÍ POJISTKOU
+/* ==============================================
+   DETAIL RECEPTU (modal)
+   ============================================== */
 async function openRecipeDetail(idMeal) {
     modalBody.innerHTML = '<p class="loading-text">Načítám a připravuji recept...</p>';
-    recipeModal.style.display = "block";
+    recipeModal.style.display = 'block';
 
     try {
-        // Podíváme se, jestli už recept není uložený v oblíbených
-        const favourites = JSON.parse(localStorage.getItem('favourite_recipes')) || [];
-        const cachedCzechMeal = favourites.find(fav => fav.idMeal === idMeal);
+        const favourites = getFromStorage('favourite_recipes');
+        const cached     = favourites.find(f => f.idMeal === idMeal);
+        let   meal       = cached?.extractedIngredients ? cached : null;
 
-        let mealToDisplay = null;
-
-        if (cachedCzechMeal && cachedCzechMeal.extractedIngredients) {
-            mealToDisplay = cachedCzechMeal;
-        } else {
-            const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`);
-            const data = await response.json();
-            if (!data.meals || !data.meals[0]) throw new Error("Recept nenalezen");
-            
-            const rawMeal = data.meals[0];
-            
-            // Zkusí přeložit tm. 3s
-            mealToDisplay = await translateRecipe(rawMeal);
-            
-            // Pokud překlad trval moc dlouho nebo selhal použije se anglický základ
-            if (!mealToDisplay) {
-                const extractedIngredients = [];
-                for (let i = 1; i <= 20; i++) {
-                    const ing = rawMeal[`strIngredient${i}`];
-                    const meas = rawMeal[`strMeasure${i}`];
-                    if (ing && ing.trim() !== "") {
-                        extractedIngredients.push({ ingredient: ing.trim(), measure: meas ? meas.trim() : "" });
-                    }
-                }
-                mealToDisplay = {
-                    idMeal: rawMeal.idMeal,
-                    strMeal: rawMeal.strMeal,
-                    strMealThumb: rawMeal.strMealThumb,
-                    strCategory: (rawMeal.strCategory || 'Neznámá') + " (EN)",
-                    strArea: (rawMeal.strArea || 'Neznámá') + " (EN)",
-                    strInstructions: rawMeal.strInstructions,
-                    extractedIngredients
-                };
-            }
+        if (!meal) {
+            const data = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`).then(r => r.json());
+            const raw  = data.meals?.[0];
+            if (!raw) throw new Error('Recept nenalezen');
+            meal = (await translateRecipe(raw)) || buildFallbackMeal(raw, ' (EN)');
         }
 
-        // Vygenerování HTML pro ingredience
-        let ingredientsHTML = '';
-        mealToDisplay.extractedIngredients.forEach(item => {
-            ingredientsHTML += `<li>${item.ingredient} - <small>${item.measure}</small></li>`;
-        });
+        const ingredientsHTML = meal.extractedIngredients
+            .map(({ ingredient, measure }) => `<li>${ingredient}${measure ? ` - <small>${measure}</small>` : ''}</li>`)
+            .join('');
 
         modalBody.innerHTML = `
             <div class="modal-recipe-header">
-                <img src="${mealToDisplay.strMealThumb}" alt="${mealToDisplay.strMeal}">
-                <h2>${mealToDisplay.strMeal}</h2>
-                <p><strong>Kategorie:</strong> ${mealToDisplay.strCategory} | <strong>Oblast:</strong> ${mealToDisplay.strArea}</p>
+                <img src="${meal.strMealThumb}" alt="${meal.strMeal}">
+                <h2>${meal.strMeal}</h2>
+                <p><strong>Kategorie:</strong> ${meal.strCategory} | <strong>Oblast:</strong> ${meal.strArea}</p>
             </div>
             <div class="modal-recipe-content">
                 <h3>Co budete potřebovat:</h3>
                 <ul>${ingredientsHTML}</ul>
-                
                 <h3>Postup přípravy:</h3>
-                <p class="recipe-instructions">${mealToDisplay.strInstructions.replace(/\n/g, '<br>')}</p>
+                <p class="recipe-instructions">${meal.strInstructions.replace(/\n/g, '<br>')}</p>
             </div>
             <hr>
             <div class="comments-section">
@@ -930,102 +825,78 @@ async function openRecipeDetail(idMeal) {
                     <textarea id="commentText" placeholder="Napište svůj komentář k receptu..."></textarea>
                     <button id="submitCommentBtn" class="btn-add">Přidat komentář</button>
                 </div>
-            </div>
-        `;
+            </div>`;
 
         loadComments(idMeal);
-
-        document.getElementById('submitCommentBtn').addEventListener('click', () => {
-            saveComment(idMeal);
-        });
-
+        document.getElementById('submitCommentBtn').addEventListener('click', () => saveComment(idMeal));
         document.getElementById('commentsList').addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-delete-comment')) {
-                const commentId = parseInt(e.target.getAttribute('data-comment-id'), 10);
-                deleteComment(idMeal, commentId);
-            }
+            if (e.target.classList.contains('btn-delete-comment'))
+                deleteComment(idMeal, parseInt(e.target.dataset.commentId, 10));
         });
 
-    } catch (error) {
+    } catch (err) {
         modalBody.innerHTML = '<p class="empty-recipes-text">Nepodařilo se načíst detaily receptu.</p>';
-        console.error(error);
+        console.error(err);
     }
 }
 
-// SPRÁVA POZNÁMEK A KOMENTÁŘŮ 
+/* ==============================================
+   KOMENTÁŘE
+   ============================================== */
 function loadComments(idMeal) {
     const commentsList = document.getElementById('commentsList');
-    const allComments = JSON.parse(localStorage.getItem('recipe_comments')) || {};
-    let recipeComments = allComments[idMeal] || [];
-    let databaseNeedsUpdate = false;
+    if (!commentsList) return;
 
-    commentsList.innerHTML = '';
-    if (recipeComments.length === 0) {
+    const allComments = JSON.parse(localStorage.getItem('recipe_comments') || '{}');
+    let comments      = allComments[idMeal] || [];
+    let dirty         = false;
+
+    // Migrace starého formátu (string → objekt)
+    comments = comments.map((c, i) => {
+        if (typeof c === 'string') { dirty = true; return { id: Date.now() + i, text: c, date: 'Starší komentář' }; }
+        return c;
+    });
+
+    if (dirty) {
+        allComments[idMeal] = comments;
+        localStorage.setItem('recipe_comments', JSON.stringify(allComments));
+    }
+
+    if (!comments.length) {
         commentsList.innerHTML = '<p class="no-comments">K tomuto receptu zatím nejsou žádné komentáře.</p>';
         return;
     }
 
-    recipeComments = recipeComments.map((comment, index) => {
-        if (typeof comment === 'string') {
-            databaseNeedsUpdate = true;
-            return {
-                id: Date.now() + index,
-                text: comment,
-                date: 'Starší komentář'
-            };
-        }
-        return comment;
-    });
-
-    if (databaseNeedsUpdate) {
-        allComments[idMeal] = recipeComments;
-        localStorage.setItem('recipe_comments', JSON.stringify(allComments));
-    }
-
-    recipeComments.forEach(comment => {
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment-item';
-        commentDiv.innerHTML = `
+    commentsList.innerHTML = comments.map(c => `
+        <div class="comment-item">
             <div class="comment-content">
-                <p class="comment-body">${comment.text}</p>
-                <span class="comment-date">${comment.date}</span>
+                <p class="comment-body">${c.text}</p>
+                <span class="comment-date">${c.date}</span>
             </div>
-            <button class="btn-delete-comment" data-comment-id="${comment.id}">❌</button>
-        `;
-        commentsList.appendChild(commentDiv);
-    });
+            <button class="btn-delete-comment" data-comment-id="${c.id}">❌</button>
+        </div>`).join('');
 }
 
 function saveComment(idMeal) {
     const textarea = document.getElementById('commentText');
-    const text = textarea.value.trim();
+    const text     = textarea?.value.trim();
     if (!text) return;
 
-    const allComments = JSON.parse(localStorage.getItem('recipe_comments')) || {};
+    const allComments = JSON.parse(localStorage.getItem('recipe_comments') || '{}');
     if (!allComments[idMeal]) allComments[idMeal] = [];
-
-    const newComment = {
-        id: Date.now(),
-        text: text,
-        date: new Date().toLocaleString('cs-CZ')
-    };
-
-    allComments[idMeal].push(newComment);
+    allComments[idMeal].push({ id: Date.now(), text, date: new Date().toLocaleString('cs-CZ') });
     localStorage.setItem('recipe_comments', JSON.stringify(allComments));
-    
+
     textarea.value = '';
     loadComments(idMeal);
 }
 
 function deleteComment(idMeal, commentId) {
-    const allComments = JSON.parse(localStorage.getItem('recipe_comments')) || {};
+    const allComments = JSON.parse(localStorage.getItem('recipe_comments') || '{}');
     if (!allComments[idMeal]) return;
 
-    allComments[idMeal] = allComments[idMeal].filter(comment => comment.id !== commentId);
-
-    if (allComments[idMeal].length === 0) {
-        delete allComments[idMeal];
-    }
+    allComments[idMeal] = allComments[idMeal].filter(c => c.id !== commentId);
+    if (!allComments[idMeal].length) delete allComments[idMeal];
 
     localStorage.setItem('recipe_comments', JSON.stringify(allComments));
     loadComments(idMeal);
