@@ -6,6 +6,20 @@
     <title>SmartCook – Recepty co dům dal</title>
     <!-- Připojení externího CSS souboru -->
     <link rel="stylesheet" href="style.css">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker úspěšně registrován!', reg))
+            .catch(err => console.log('Registrace Service Workeru selhala.', err));
+        });
+    }
+    </script>
+
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay">
