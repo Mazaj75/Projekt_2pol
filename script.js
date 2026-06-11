@@ -256,7 +256,6 @@ const INGREDIENTS_DB = [
     { czech: "sójová omáčka tmavá", english: "dark soy sauce" }
 ];
 
-// Předpočítané mapy pro O(1) vyhledávání (místo opakovaného .find() přes celé pole)
 const czechToEnglishMap = new Map(INGREDIENTS_DB.map(i => [i.czech.toLowerCase(), i.english]));
 const englishToCzechMap = new Map(INGREDIENTS_DB.map(i => [i.english.toLowerCase(), i.czech]));
 
@@ -264,10 +263,11 @@ const englishToCzechMap = new Map(INGREDIENTS_DB.map(i => [i.english.toLowerCase
    INICIALIZACE
    ============================================== */
 document.addEventListener('DOMContentLoaded', () => {
-    // Skrytí loading overlaye — DB je lokální, žádné async načítání není potřeba
+    // skrytí sterého loading overlaye
     const loadingOverlay = document.getElementById('loadingOverlay');
     if (loadingOverlay) loadingOverlay.style.display = 'none';
 
+    
     if (ingredientsList) {
         loadIngredients();
     } else if (recipesGrid) {
@@ -350,7 +350,7 @@ function initNewsletterForm() {
 }
 
 /* ==============================================
-   HELPERS — LocalStorage
+   LocalStorage
    ============================================== */
 function getFromStorage(key) {
     try { return JSON.parse(localStorage.getItem(key)) || []; }
@@ -362,14 +362,14 @@ function saveToStorage(key, value) {
 }
 
 /* ==============================================
-   HELPERS — Řetězce
+   Řetězce
    ============================================== */
 function removeAccents(text) {
     return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function normalizeStr(str) {
-    return removeAccents(str.toLowerCase().trim());
+function normalizeStr(str) { 
+    return removeAccents(str.toLowerCase().trim()); 
 }
 
 /* ==============================================
@@ -752,6 +752,7 @@ function displayRecipes(meals) {
             const favs = getFromStorage('favourite_recipes');
             const idx  = favs.findIndex(f => f.idMeal === id);
 
+            // odebrání
             if (idx > -1) {
                 favs.splice(idx, 1);
                 btn.classList.remove('is-favourite');
@@ -760,6 +761,7 @@ function displayRecipes(meals) {
                     if (!recipesGrid.querySelector('.recipe-card'))
                         recipesGrid.innerHTML = '<p class="empty-recipes-text">Zatím nemáte žádné oblíbené recepty.</p>';
                 }
+            // přidání
             } else {
                 btn.innerText = '⏳';
                 try {
@@ -790,10 +792,12 @@ async function openRecipeDetail(idMeal) {
     recipeModal.style.display = 'block';
 
     try {
+        // načtení oblíbených
         const favourites = getFromStorage('favourite_recipes');
         const cached     = favourites.find(f => f.idMeal === idMeal);
         let   meal       = cached?.extractedIngredients ? cached : null;
 
+        // pokud se recept nenačetl z local storage
         if (!meal) {
             const data = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`).then(r => r.json());
             const raw  = data.meals?.[0];
